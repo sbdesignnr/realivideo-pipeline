@@ -45,6 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libopencv-dev \
         colmap \
         ffmpeg \
+        openssh-server \
         python3 python3-numpy \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -69,5 +70,11 @@ RUN cmake .. -GNinja \
     && (cp simple_trainer /usr/local/bin/ 2>/dev/null || true) \
     && find /opt/opensplat-src/build -name '*.o' -delete
 
+# Štartovací skript: bez neho kontajner po vypísaní CUDA banneru skončí
+# a RunPod ho reštartuje dokola (overené — presne to sa stalo pri prvom pode).
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
 WORKDIR /workspace
-CMD ["/bin/bash"]
+EXPOSE 22
+CMD ["/usr/local/bin/start.sh"]
