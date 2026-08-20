@@ -27,7 +27,12 @@ ARG TORCH_CUDA_TAG=cu121
 ARG CMAKE_CUDA_ARCHITECTURES="86;89"
 
 # Pripnutý tag, nie main — build o mesiac má vyrobiť to isté čo dnes.
-ARG OPENSPLAT_REF=v1.1.6
+# POZOR: musí to byť tag, ktorý naozaj existuje. Súbor VERSION na vetve main
+# ukazuje PRIPRAVOVANÚ verziu, na ktorú tag ešte nemusí byť vytvorený —
+# na tom prvý build zlyhal (VERSION=1.1.6, ale tag v1.1.6 neexistuje).
+# Zoznam skutočných tagov: git ls-remote --tags https://github.com/pierotofy/OpenSplat.git
+# v1.2.0 používa rovnaký libtorch 2.2.1 + CUDA 12.1.1 ako máme nastavené vyššie.
+ARG OPENSPLAT_REF=v1.2.0
 ARG CMAKE_BUILD_TYPE=Release
 
 ENV DEBIAN_FRONTEND=noninteractive \

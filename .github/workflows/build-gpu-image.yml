@@ -34,6 +34,23 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # Overiť tag PRED buildom. Build trvá 40-90 min; neexistujúci tag by sa
+      # inak prejavil až pri git clone, po ~20 minútach sťahovania libtorchu.
+      - name: Overiť, že OPENSPLAT_REF existuje
+        run: |
+          REF=$(grep -oP '(?<=^ARG OPENSPLAT_REF=).*' docker/Dockerfile.gpu | tail -1)
+          echo "Dockerfile žiada OpenSplat ref: $REF"
+          if git ls-remote --exit-code --tags \
+               https://github.com/pierotofy/OpenSplat.git "refs/tags/$REF" >/dev/null 2>&1; then
+            echo "✅ tag $REF existuje"
+          else
+            echo "❌ tag '$REF' v OpenSplat repozitári NEEXISTUJE."
+            echo "Dostupné tagy:"
+            git ls-remote --tags https://github.com/pierotofy/OpenSplat.git \
+              | sed 's|.*refs/tags/||' | grep -v '\^{}' | sort -V | tail -10
+            exit 1
+          fi
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Prihlásiť sa do ghcr.io
