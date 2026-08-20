@@ -1,0 +1,9 @@
+# Dáta do repozitára nepatria — snímky, modely a logy majú stovky MB
+data/
+*.mp4
+*.mov
+*.MOV
+*.ply
+*.splat
+.DS_Store
+__pycache__/

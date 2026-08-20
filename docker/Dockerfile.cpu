@@ -1,0 +1,45 @@
+# =============================================================================
+# realivideo / CPU stage — COLMAP (Structure-from-Motion) + ffmpeg
+# =============================================================================
+# Čo tento image robí:
+#   video.mp4 --(ffmpeg)--> snímky --(COLMAP)--> pozície kamery + riedky mrak bodov
+#
+# Prečo je oddelený od GPU image:
+#   COLMAP tu beží čisto na CPU (Ubuntu balík je zostavený bez CUDA), takže
+#   nemá zmysel platiť za GPU pod, kým sa počítajú pozície kamery. Zároveň je
+#   tento image dosť malý a bez CUDA, takže sa dá zostaviť a spustiť aj na
+#   Apple Silicon Macu — čo je jediná časť pipeline, ktorú vieš testovať doma.
+#
+# Build (natívne, na tvojom Macu):
+#   docker build -f docker/Dockerfile.cpu -t realivideo-cpu:dev .
+# Build pre RunPod (x86_64):
+#   docker build --platform linux/amd64 -f docker/Dockerfile.cpu -t realivideo-cpu:amd64 .
+# =============================================================================
+
+FROM ubuntu:24.04
+
+# Ubuntu 24.04 nesie COLMAP 3.9.1 (22.04 má len 3.7). Balík je dostupný
+# pre amd64 aj arm64, takže rovnaký Dockerfile funguje na Macu aj na RunPode.
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    # COLMAP je zostavený s Qt. CLI príkazy GUI nepotrebujú, ale Qt sa aj tak
+    # pokúša otvoriť displej — offscreen platforma to umlčí.
+    QT_QPA_PLATFORM=offscreen \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        colmap \
+        ffmpeg \
+        python3 \
+        python3-numpy \
+        ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# /workspace je miesto, kam sa bude mountovať vstupné video a výstupné dáta:
+#   docker run --rm -v "$PWD/data:/workspace" realivideo-cpu:dev ...
+VOLUME ["/workspace"]
+
+CMD ["/bin/bash"]

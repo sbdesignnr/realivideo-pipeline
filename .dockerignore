@@ -1,0 +1,12 @@
+# Do build kontextu nepatria dáta ani nič veľké — inak sa pri každom builde
+# posiela celý priečinok démonovi a build sa zbytočne vlečie.
+data/
+out/
+*.mp4
+*.mov
+*.ply
+*.splat
+.git/
+.venv/
+__pycache__/
+.DS_Store

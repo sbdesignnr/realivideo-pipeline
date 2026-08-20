@@ -1,0 +1,68 @@
+# =============================================================================
+# realivideo / GPU stage — OpenSplat (3D Gaussian Splatting)
+# =============================================================================
+# ⚠️ NEDÁ SA ZOSTAVIŤ NA APPLE SILICON. libtorch s CUDA existuje len pre x86_64.
+#    Zostavuje sa cez GitHub Actions -> ghcr.io (.github/workflows/build-gpu-image.yml).
+#
+# ── Prečo tu COLMAP NIE JE skompilovaný s CUDA ───────────────────────────────
+# Pôvodne som to plánoval, lebo CPU COLMAP je pomalý. Pre PRVÝ build to ale
+# zámerne odkladám: kompilácia COLMAPu zo zdrojáku (Ceres, Boost, FreeImage,
+# Qt5...) je samostatný veľký build, ktorý by zdvojnásobil počet vecí, čo môžu
+# zlyhať naraz. Najprv chceme vedieť, že OpenSplat vôbec beží.
+# COLMAP s CUDA pribudne v druhej iterácii, keď bude build pipeline overená.
+# Zatiaľ je tu balíčkový COLMAP (bez CUDA) len na pohodlie/kontrolu.
+# =============================================================================
+
+ARG CUDA_VERSION=12.1.1
+ARG UBUNTU_VERSION=22.04
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION}
+
+# libtorch musí verziou sedieť s CUDA (cu121 <-> CUDA 12.1). Nemeniť samostatne.
+ARG TORCH_VERSION=2.2.1
+ARG TORCH_CUDA_TAG=cu121
+
+# Compute capability, NIE názov karty: 86 = RTX 3090/A5000, 89 = RTX 4090/L40S.
+# Upstream default (70;75;80) by na 4090 nefungoval. 86 je záloha, keď 4090
+# na RunPode nie je voľná.
+ARG CMAKE_CUDA_ARCHITECTURES="86;89"
+
+# Pripnutý tag, nie main — build o mesiac má vyrobiť to isté čo dnes.
+ARG OPENSPLAT_REF=v1.1.6
+ARG CMAKE_BUILD_TYPE=Release
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    QT_QPA_PLATFORM=offscreen \
+    PYTHONUNBUFFERED=1
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake ninja-build git wget unzip ca-certificates \
+        libopencv-dev \
+        colmap \
+        ffmpeg \
+        python3 python3-numpy \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# libtorch: ~2,5 GB zip, ~5 GB rozbalené — najväčšia časť image-u
+WORKDIR /opt
+RUN wget -nv -O libtorch.zip \
+      "https://download.pytorch.org/libtorch/${TORCH_CUDA_TAG}/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2B${TORCH_CUDA_TAG}.zip" \
+    && unzip -q libtorch.zip -d /opt && rm libtorch.zip
+ENV LD_LIBRARY_PATH=/opt/libtorch/lib:${LD_LIBRARY_PATH}
+
+RUN git clone --depth 1 --branch ${OPENSPLAT_REF} \
+        https://github.com/pierotofy/OpenSplat.git /opt/opensplat-src
+
+WORKDIR /opt/opensplat-src/build
+RUN cmake .. -GNinja \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+        -DCMAKE_PREFIX_PATH=/opt/libtorch \
+        -DCMAKE_CUDA_ARCHITECTURES="${CMAKE_CUDA_ARCHITECTURES}" \
+        -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
+    && ninja \
+    && cp opensplat /usr/local/bin/ \
+    && (cp simple_trainer /usr/local/bin/ 2>/dev/null || true) \
+    && find /opt/opensplat-src/build -name '*.o' -delete
+
+WORKDIR /workspace
+CMD ["/bin/bash"]
