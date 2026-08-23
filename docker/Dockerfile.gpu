@@ -56,6 +56,12 @@ RUN wget -nv -O libtorch.zip \
     && unzip -q libtorch.zip -d /opt && rm libtorch.zip
 ENV LD_LIBRARY_PATH=/opt/libtorch/lib:${LD_LIBRARY_PATH}
 
+# LD_LIBRARY_PATH cez ENV dostane len proces PID 1. sshd si pre každú reláciu
+# stavia čisté prostredie a premenné LD_* zámerne nepreberá — takže po
+# pripojení cez SSH by dynamický linker libtorch nenašiel, hoci pri štarte
+# kontajnera všetko funguje. Zápis do ld.so.conf.d je na prostredí nezávislý.
+RUN echo /opt/libtorch/lib > /etc/ld.so.conf.d/libtorch.conf && ldconfig
+
 RUN git clone --depth 1 --branch ${OPENSPLAT_REF} \
         https://github.com/pierotofy/OpenSplat.git /opt/opensplat-src
 
